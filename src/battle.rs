@@ -40,7 +40,8 @@ pub async fn add_link_to_battle_log(http_client: Client, log_uuid: &str, link: &
         .send()
         .await;
 
-    update_request.expect("Unable to update Battle log!");
+    let res = update_request.expect("Unable to update Salmon log!");
+    assert!(res.status().is_success());
     info!("Updated Battle log!");
 }
 

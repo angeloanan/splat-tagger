@@ -13,11 +13,11 @@ mod youtube;
 
 use chrono::DateTime;
 use config::Config;
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, process::exit, sync::Arc};
 use tokio::task::JoinSet;
 
 use clap::{command, Parser};
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -183,8 +183,13 @@ async fn main() {
         ));
     }
 
-    while (data_mod.join_next().await).is_some() {
-        // No-op
+    while let Some(fut) = data_mod.join_next().await {
+        if let Err(e) = fut {
+            error!("Unable to update a run. Is your Identity cookie expired?");
+            error!("Please double check your configuration file and try again.");
+            error!("Error: {}", e);
+            exit(1);
+        }
     }
 
     info!("Finished modifying all runs!");
