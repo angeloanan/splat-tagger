@@ -76,7 +76,10 @@ async fn main() {
     )
     .unwrap_or_else(|_| Config::default());
 
-    info!("Modifying most recent Salmon Run data using the following configuration:");
+    info!(
+        "Using config file: {}",
+        config_dir.join("config.toml").display()
+    );
     info!("Livestream ID: {}", args.youtube_stream_url);
     info!("Stat.ink Username: {}", config.statink.username);
 
