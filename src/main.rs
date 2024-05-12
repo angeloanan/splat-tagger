@@ -80,7 +80,29 @@ async fn main() {
         "Using config file: {}",
         config_dir.join("config.toml").display()
     );
-    info!("Livestream ID: {}", args.youtube_stream_url);
+
+    // Parse YouTube URL to get the video ID
+    let livestream_id = if args.youtube_stream_url.contains("youtube.com/watch") {
+        args.youtube_stream_url.split('=').last().map_or_else(
+            || {
+                error!("Invalid YouTube URL provided!");
+                exit(1);
+            },
+            std::string::ToString::to_string,
+        )
+    } else if args.youtube_stream_url.contains("youtube.com/live") {
+        args.youtube_stream_url.split('/').last().map_or_else(
+            || {
+                error!("Invalid YouTube URL provided!");
+                exit(1);
+            },
+            std::string::ToString::to_string,
+        )
+    } else {
+        args.youtube_stream_url
+    };
+
+    info!("Livestream ID: {}", livestream_id);
     info!("Stat.ink Username: {}", config.statink.username);
 
     let http_cookie_jar = reqwest::cookie::Jar::default();
@@ -103,11 +125,7 @@ async fn main() {
         .expect("Unable to create HTTP client!");
 
     let (livestream_data, recent_salmon_data, recent_battle_data) = tokio::join!(
-        youtube::fetch_video_data(
-            client.clone(),
-            &config.google_api_key,
-            &args.youtube_stream_url
-        ),
+        youtube::fetch_video_data(client.clone(), &config.google_api_key, &livestream_id),
         salmon::get_salmon_log(client.clone(), &config.statink.username),
         battle::get_battle_log(client.clone(), &config.statink.username)
     );
@@ -157,7 +175,7 @@ async fn main() {
         let difference = run_start_time - stream_start_time;
         let link = format!(
             "https://youtube.com/watch?v={}&t={}s",
-            args.youtube_stream_url,
+            &livestream_id,
             difference.num_seconds() + args.offset
         );
 
@@ -172,7 +190,7 @@ async fn main() {
         let difference = battle_start_time - stream_start_time;
         let link = format!(
             "https://youtube.com/watch?v={}&t={}s",
-            args.youtube_stream_url,
+            &livestream_id,
             difference.num_seconds() + args.offset
         );
 
