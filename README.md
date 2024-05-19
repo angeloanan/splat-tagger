@@ -22,7 +22,7 @@ Options:
   -V, --version                  Print version
 ```
 
-## Usage
+## Installation
 
 ### via Manual Download
 
