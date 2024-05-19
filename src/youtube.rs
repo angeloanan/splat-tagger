@@ -1,6 +1,8 @@
+use std::process::exit;
+
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, instrument};
+use tracing::{debug, error, instrument};
 
 pub const YOUTUBE_VIDEO_DATA_API_URL: &str = "https://www.googleapis.com/youtube/v3/videos";
 
@@ -27,7 +29,13 @@ pub async fn fetch_video_data(http_client: Client, api_key: &str, video_id: &str
     let livestream_data = livestream_request
         .json::<YouTubeDataList>()
         .await
-        .expect("Unable to parse JSON response");
+        .unwrap_or_else(|e| {
+            error!(
+                "Unable to parse YouTube livestream data. Did you copy a Video ID instead of a Livestream ID?"
+            );
+            error!("{:?}", e);
+            exit(1);
+        });
 
     let livestream_items = livestream_data.items;
     debug!("Livestream data: {livestream_items:?}");
