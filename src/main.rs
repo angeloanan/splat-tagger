@@ -33,7 +33,7 @@ struct Args {
     // #[arg(short, long, default_value_t = true)]
     // salmon_run: bool,
     /// Amount of seconds to adjust for any stream delays
-    #[arg(short, long, default_value_t = 0)]
+    #[arg(short, long, default_value_t = 10)]
     offset: i64,
 
     /// The directory to store configuration files
