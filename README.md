@@ -16,7 +16,7 @@ Arguments:
   <YOUTUBE_STREAM_URL>  The Youtube stream URL to fetch data from (e.g. `dQw4w9WgXcQ`)
 
 Options:
-  -o, --offset <OFFSET>          Amount of seconds to adjust for any stream delays [default: 0]
+  -o, --offset <OFFSET>          Amount of seconds to adjust for any stream delays [default: 10]
       --config-dir <CONFIG_DIR>  The directory to store configuration files
   -h, --help                     Print help
   -V, --version                  Print version
@@ -30,7 +30,7 @@ Download the latest release from the [releases page](https://github.com/angeloan
 
 On Unix / macOS systems, you'll need to allow the binary to be executed with `chmod +x splat-tagger`.
 
-Run the binary with the YouTube stream URL as the first argument.
+Run the executable on a terminal (command prompt) with the YouTube stream URL as the first argument.
 
 ### via Cargo Install (Build from scratch)
 
