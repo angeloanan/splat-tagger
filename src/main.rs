@@ -141,6 +141,16 @@ async fn main() {
     info!("Stream start: {}", stream_start_time);
     info!("Stream end: {}", stream_end_time);
 
+    let battle_to_modify: battle::LogList = recent_battle_data
+        .iter()
+        .filter(|&d| {
+            let battle_start_time = DateTime::parse_from_rfc3339(&d.start_at.iso8601).unwrap();
+            battle_start_time > stream_start_time && battle_start_time < stream_end_time
+        })
+        .cloned()
+        .collect();
+    info!("Found {} battles to modify", battle_to_modify.len());
+
     let salmon_runs_to_modify: salmon::LogList = recent_salmon_data
         .iter()
         .filter(|&d| {
@@ -153,16 +163,6 @@ async fn main() {
         "Found {} salmon runs to modify",
         salmon_runs_to_modify.len()
     );
-
-    let battle_to_modify: battle::LogList = recent_battle_data
-        .iter()
-        .filter(|&d| {
-            let battle_start_time = DateTime::parse_from_rfc3339(&d.start_at.iso8601).unwrap();
-            battle_start_time > stream_start_time && battle_start_time < stream_end_time
-        })
-        .cloned()
-        .collect();
-    info!("Found {} battles to modify", battle_to_modify.len());
 
     assert!(
         !(battle_to_modify.is_empty() && salmon_runs_to_modify.is_empty()),
