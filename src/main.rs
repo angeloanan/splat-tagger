@@ -165,7 +165,7 @@ async fn main() {
     info!("Found {} battles to modify", battle_to_modify.len());
 
     assert!(
-        !(!salmon_runs_to_modify.is_empty() && !battle_to_modify.is_empty()),
+        !(battle_to_modify.is_empty() && salmon_runs_to_modify.is_empty()),
         "Found no battles to modify!"
     );
 
