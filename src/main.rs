@@ -11,9 +11,11 @@ mod config;
 mod salmon;
 mod youtube;
 
-use chrono::DateTime;
+use chrono::{DateTime, Duration};
 use config::Config;
-use std::{path::PathBuf, process::exit, sync::Arc};
+use copypasta::ClipboardProvider;
+use salmon::tide_to_abbr;
+use std::{collections::BTreeMap, path::PathBuf, process::exit, sync::Arc};
 use tokio::task::JoinSet;
 
 use clap::{command, Parser};
@@ -39,6 +41,14 @@ struct Args {
     /// The directory to store configuration files
     #[arg(long)]
     config_dir: Option<PathBuf>,
+
+    /// Whether to run the script without modifying any data
+    #[arg(short = 'n', long = "dry-run", default_value_t = false)]
+    dry_run: bool,
+
+    /// Generate a YouTube description containing a summary of the battles
+    #[arg(short = 'g', long = "gen-desc", default_value_t = false)]
+    generate_description: bool,
 }
 
 #[allow(clippy::too_many_lines)]
@@ -170,7 +180,7 @@ async fn main() {
     );
 
     let mut data_mod: JoinSet<()> = JoinSet::new();
-    for run in salmon_runs_to_modify {
+    for run in &salmon_runs_to_modify {
         let run_start_time = DateTime::parse_from_rfc3339(&run.start_at.iso8601).unwrap();
         let difference = run_start_time - stream_start_time;
         let link = format!(
@@ -179,13 +189,17 @@ async fn main() {
             difference.num_seconds() + args.offset
         );
 
-        data_mod.spawn(salmon::add_link_to_salmon_log(
-            client.clone(),
-            run.id.leak(),
-            link.leak(),
-        ));
+        if args.dry_run {
+            info!("Will modify run {} with URL {link}", run.id);
+        } else {
+            data_mod.spawn(salmon::add_link_to_salmon_log(
+                client.clone(),
+                run.id.clone(),
+                link,
+            ));
+        }
     }
-    for battle in battle_to_modify {
+    for battle in &battle_to_modify {
         let battle_start_time = DateTime::parse_from_rfc3339(&battle.start_at.iso8601).unwrap();
         let difference = battle_start_time - stream_start_time;
         let link = format!(
@@ -194,11 +208,15 @@ async fn main() {
             difference.num_seconds() + args.offset
         );
 
-        data_mod.spawn(battle::add_link_to_battle_log(
-            client.clone(),
-            battle.id.leak(),
-            link.leak(),
-        ));
+        if args.dry_run {
+            info!("Will modify battle {} with URL {link}", battle.id);
+        } else {
+            data_mod.spawn(battle::add_link_to_battle_log(
+                client.clone(),
+                battle.id.clone(),
+                link,
+            ));
+        }
     }
 
     while let Some(fut) = data_mod.join_next().await {
@@ -211,4 +229,98 @@ async fn main() {
     }
 
     info!("Finished modifying all runs!");
+
+    if args.generate_description {
+        info!("Generating YouTube description...");
+
+        let mut timestamps: BTreeMap<i64, String> = BTreeMap::new();
+        timestamps.insert(0, "00:00:00 Warming up...".to_string());
+
+        // 00:00:00 Turf War Win (50.0% vs 49.9%)
+        // 00:00:00 Tricolor Win (33.3% vs 21.9% vs 11.1%)
+        // 00:00:00 Rainmaker Open Win (C+ 1980)
+        // 00:00:00 Zones Open Win (C+ 1980)
+        // 00:00:00 Clam Open Win (100pts vs 5pts)
+        // 00:00:00 Tower Open Win ()
+
+        // TODO: Finish this
+        // for battle in battle_to_modify {
+        //     let battle_start_time = DateTime::parse_from_rfc3339(&battle.start_at.iso8601).unwrap();
+        //     let difference = battle_start_time - stream_start_time + Duration::seconds(args.offset);
+        //     let mut line = format!(
+        //         "{:02}:{:02}:{:02} {} ",
+        //         difference.num_hours(),
+        //         difference.num_minutes() % 60,
+        //         difference.num_seconds() % 60,
+        //     );
+
+        //     timestamps.insert(difference.num_seconds(), line);
+        // }
+
+        for runs in salmon_runs_to_modify {
+            let run_start_time = DateTime::parse_from_rfc3339(&runs.start_at.iso8601).unwrap();
+            let difference = run_start_time - stream_start_time + Duration::seconds(args.offset);
+            let mut line = format!(
+                "{:02}:{:02}:{:02} SR {}% {} (",
+                difference.num_hours(),
+                difference.num_minutes() % 60,
+                difference.num_seconds() % 60,
+                runs.danger_rate.unwrap_or(0),
+                runs.golden_eggs,
+            );
+
+            let mut wave_num = 0;
+            for wave in &runs.waves {
+                wave_num += 1;
+                if wave_num > 3 {
+                    continue;
+                }
+
+                // Deliveries
+                let dv = wave.golden_delivered;
+                let tide = tide_to_abbr(&wave.tide.key);
+                if let Some(event) = &wave.event {
+                    match event.key.as_str() {
+                        "giant_tornado" => line.push_str(&format!("Tornado {dv}")),
+                        "rush" => line.push_str(&format!("Rush {dv}")),
+                        "cohock_charge" => line.push_str(&format!("Cohock {dv}")),
+                        "mothership" => line.push_str(&format!("Mothership {dv}")),
+                        "griller" => line.push_str(&format!("Griller {dv}")),
+                        "fog" => line.push_str(&format!("{tide} Fog {dv}")),
+                        "goldie_seeking" => line.push_str(&format!("{tide} Seeking {dv}")),
+                        "mudmouth_eruption" => line.push_str(&format!("{tide} Mudmouth {dv}")),
+                        _ => line.push_str("UNKNOWN EVENT"),
+                    };
+                } else {
+                    line.push_str(&format!("{tide} {dv}"));
+                }
+
+                if wave_num < 3 && runs.waves.len() != wave_num {
+                    line.push_str(", ");
+                }
+            }
+
+            line.push(')');
+            timestamps.insert(difference.num_seconds(), line);
+        }
+
+        println!();
+        for stamps in &timestamps {
+            println!("{}", stamps.1);
+        }
+        println!();
+
+        let mut ctx =
+            copypasta::ClipboardContext::new().expect("Unable to create clipboard context");
+        ctx.set_contents(
+            timestamps
+                .iter()
+                .map(|t| t.1.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        )
+        .expect("Unable to copy timestamps to clipboard!");
+
+        info!("The YouTube description has been copied to your clipboard!");
+    }
 }

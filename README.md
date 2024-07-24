@@ -18,6 +18,8 @@ Arguments:
 Options:
   -o, --offset <OFFSET>          Amount of seconds to adjust for any stream delays [default: 10]
       --config-dir <CONFIG_DIR>  The directory to store configuration files
+  -n, --dry-run                  Whether to run the script without modifying any data
+  -g, --gen-desc                 Generate a YouTube description containing a summary of the battles
   -h, --help                     Print help
   -V, --version                  Print version
 ```
